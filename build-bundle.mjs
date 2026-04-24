@@ -25,7 +25,7 @@ _setWasmInput(bytes);
 export { trace };
 `);
 
-const outfile = path.join(pkgDir, 'vectortracer.bundle.js');
+const outfile = path.join(pkgDir, 'index.bundle.js');
 
 try {
   execSync(
@@ -33,7 +33,7 @@ try {
     { stdio: 'inherit', cwd: pkgDir }
   );
   const size = (readFileSync(outfile).length / 1024).toFixed(1);
-  console.log(`  vectortracer.bundle.js  (${size} KB)`);
+  console.log(`  index.bundle.js  (${size} KB)`);
 } finally {
   unlinkSync(entryPath);
 }

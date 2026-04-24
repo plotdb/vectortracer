@@ -45,7 +45,7 @@ All build output lands in `pkg/`. Source files under `src/` are never modified.
 | `pkg/vectortracer_bg.wasm` | compiled WASM binary |
 | `pkg/api.js` | high-level ES module API |
 | `pkg/vectortracer-global.js` | global script wrapper (`window.vectortracer`) |
-| `pkg/vectortracer.bundle.js` | self-contained IIFE bundle, WASM inline |
+| `pkg/index.bundle.js` | self-contained IIFE bundle, WASM inline |
 
 ---
 
@@ -77,12 +77,12 @@ No `type="module"` needed. `api.js` is loaded lazily on first call.
 </script>
 ```
 
-### Option C — self-contained bundle (`pkg/vectortracer.bundle.js`)
+### Option C — self-contained bundle (`pkg/index.bundle.js`)
 
 Single file, no path dependencies. WASM is embedded as base64.
 
 ```html
-<script src="./pkg/vectortracer.bundle.js"></script>
+<script src="./pkg/index.bundle.js"></script>
 <script>
   fetch('image.png')
     .then(r => r.blob())
