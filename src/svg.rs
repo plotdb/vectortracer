@@ -9,6 +9,8 @@ pub struct SvgOptions {
 	pub backgroundColor: Option<String>,
 	pub pathFill: Option<String>,
 	pub attributes: Option<String>,
+	pub width: Option<u32>,
+	pub height: Option<u32>,
 }
 /**
 Constructs a "dumb" string only svg.
@@ -51,14 +53,23 @@ impl Svg {
 			.as_ref()
 			.unwrap_or(defaultAttributes);
 		let extra_space = if (attributes.len() > 0) { "" } else { " " };
+		let dim = match (self.options.width, self.options.height) {
+			(Some(w), Some(h)) => {
+				let sw = (w as f32 * self.options.scale) as u32;
+				let sh = (h as f32 * self.options.scale) as u32;
+				format!(r#" width="{sw}" height="{sh}" viewBox="0 0 {w} {h}""#)
+			}
+			_ => "".to_string(),
+		};
 		let res = format!(
 			r#"
-                <svg xmlns="http://www.w3.org/2000/svg" style="background:{background};"{extra_space}{attributes}>
+                <svg xmlns="http://www.w3.org/2000/svg"{dim} style="background:{background};"{extra_space}{attributes}>
                     <g transform="scale({scale})">
                         {paths}
                     </g>
                 </svg>
             "#,
+			dim = dim,
 			background = bg,
 			paths = self.paths.join(""),
 			scale = self.options.scale,

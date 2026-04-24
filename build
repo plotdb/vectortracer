@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+echo "==> clean"
+rm -rf pkg/
+
+echo "==> wasm-pack build"
+wasm-pack build --target web
+
+echo "==> copy js sources → pkg/"
+cp src/api.js pkg/api.js
+cp src/vectortracer-global.js pkg/vectortracer-global.js
+
+echo "==> bundle (inline wasm)"
+node build-bundle.mjs
+
+echo ""
+echo "Done. pkg/ contents:"
+ls pkg/

@@ -1,0 +1,11 @@
+# Rust build cache
+target/
+
+# wasm-pack / JS build output
+pkg/
+
+# Node
+node_modules/
+
+# working files
+work
