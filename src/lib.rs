@@ -19,6 +19,39 @@ pub fn main() {
 	utils::set_panic_hook();
 	console_log::init().unwrap();
 }
+/// Returns true if any pixel has alpha == 0.
+fn has_transparency(pixels: &[u8]) -> bool {
+	pixels.chunks(4).any(|p| p[3] == 0)
+}
+
+/// Find a color that doesn't appear in the image's opaque pixels.
+/// Returns None if all candidates are taken (extremely unlikely).
+fn find_key_color(pixels: &[u8]) -> Option<Color> {
+	let candidates: &[(u8, u8, u8)] = &[
+		(255, 0, 0), (0, 255, 0), (0, 0, 255),
+		(255, 255, 0), (0, 255, 255), (255, 0, 255),
+	];
+	for &(r, g, b) in candidates {
+		let used = pixels.chunks(4).any(|p| p[3] != 0 && p[0] == r && p[1] == g && p[2] == b);
+		if !used {
+			return Some(Color::new_rgba(r, g, b, 255));
+		}
+	}
+	None
+}
+
+/// Replace every alpha-0 pixel with `key`, making the image fully opaque.
+fn apply_key_color(pixels: &mut Vec<u8>, key: &Color) {
+	for chunk in pixels.chunks_mut(4) {
+		if chunk[3] == 0 {
+			chunk[0] = key.r;
+			chunk[1] = key.g;
+			chunk[2] = key.b;
+			chunk[3] = 255;
+		}
+	}
+}
+
 pub fn path_simplify_mode(s: &str) -> PathSimplifyMode {
 	match s {
 		"polygon" => PathSimplifyMode::Polygon,
@@ -130,7 +163,10 @@ impl BinaryImageConverter {
 			pixels: data.to_vec(),
 		};
 		let invert = options.invert.unwrap_or_default();
-		let image = colorImage.to_binary_image(|x| if invert { x.r > 128 } else { x.r < 128 });
+		let image = colorImage.to_binary_image(|x| {
+			if x.a == 0 { return false; } // transparent → background
+			if invert { x.r > 128 } else { x.r < 128 }
+		});
 		let debug = converterOptions.debug.is_some_and(|x| x == true);
 		if (debug) {
 			log(format!("{:#?}", converterOptions).as_str());
@@ -272,12 +308,30 @@ impl ColorImageConverter {
 	) -> Self {
 		let img_width = imageData.width();
 		let img_height = imageData.height();
+		let mut pixels = imageData.data().to_vec();
+		let debug = converterOptions.debug.is_some_and(|x| x == true);
+
+		// Keying: replace alpha-0 pixels with an unused color so the clustering
+		// can identify and discard them, leaving those areas empty in the SVG.
+		let key_color = if has_transparency(&pixels) {
+			match find_key_color(&pixels) {
+				Some(key) => {
+					apply_key_color(&mut pixels, &key);
+					if debug { log(format!("keying transparent pixels with #{:02x}{:02x}{:02x}", key.r, key.g, key.b).as_str()); }
+					key
+				}
+				None => Color::default(), // no unused color found; skip keying
+			}
+		} else {
+			Color::default() // no transparency; skip keying
+		};
+		let keying = key_color != Color::default();
+
 		let color_image = ColorImage {
 			width: img_width as usize,
 			height: img_height as usize,
-			pixels: imageData.data().to_vec(),
+			pixels,
 		};
-		let debug = converterOptions.debug.is_some_and(|x| x == true);
 
 		let runner_config = color_clusters::RunnerConfig {
 			diagonal: converterOptions.layerDifference == 0,
@@ -289,8 +343,8 @@ impl ColorImageConverter {
 			is_same_color_b: 1,
 			deepen_diff: converterOptions.layerDifference,
 			hollow_neighbours: 1,
-			key_color: Color::default(),
-			keying_action: color_clusters::KeyingAction::default(),
+			key_color,
+			keying_action: if keying { color_clusters::KeyingAction::Discard } else { color_clusters::KeyingAction::default() },
 		};
 
 		let builder = color_clusters::Runner::new(runner_config, color_image).start();
