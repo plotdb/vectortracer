@@ -45,6 +45,7 @@
   <div id="topbar">
     <input type="file" id="file-input" accept="image/*">
     <button id="run-btn" disabled>Convert</button>
+    <button id="opt-btn" disabled>Optimize (SSIM)</button>
   </div>
 
   <div class="params">
@@ -186,11 +187,37 @@
   <textarea id="svg-source" placeholder="SVG source will appear here..." readonly></textarea>
 
   <script type="module">
-    import { trace } from './pkg/api.js';
+    import { trace, optimize } from '/assets/lib/@plotdb/vectortracer/main/api.js';
 
     const $ = id => document.getElementById(id);
     const statusEl = $('status');
     const runBtn = $('run-btn');
+    const optBtn = $('opt-btn');
+
+    // Shared trace logic
+    async function doTrace() {
+      if (!currentBlob) return;
+      runBtn.disabled = true;
+      optBtn.disabled = true;
+      $('svg-container').innerHTML = '';
+      $('svg-source').value = '';
+      $('progress-bar').style.display = 'block';
+      $('progress-fill').style.width = '50%';
+      statusEl.textContent = 'Converting...';
+
+      try {
+        const svg = await trace(currentBlob, getConfigs());
+        $('svg-container').innerHTML = svg;
+        $('svg-source').value = svg;
+        $('progress-fill').style.width = '100%';
+        statusEl.textContent = `Done. SVG: ${svg.length} chars`;
+      } catch (err) {
+        statusEl.textContent = `Error: ${err}`;
+      } finally {
+        runBtn.disabled = false;
+        optBtn.disabled = false;
+      }
+    }
 
     // Wire up all sliders to show their value
     const sliders = ['filterSpeckle','pathPrecision','scale','cornerThreshold',
@@ -219,38 +246,11 @@
     });
     $('pathFill').disabled = true;
 
-    // warm up WASM on load
-    trace(await fetch('apple.png').then(r => r.blob()), { colorMode: 'bw' })
-      .then(() => {
-        statusEl.textContent = 'WASM ready. Click Convert to trace apple.png, or choose another image.';
-        runBtn.disabled = false;
-      });
-
-    let currentBlob = await fetch('apple.png').then(r => r.blob());
-
-    $('file-input').addEventListener('change', async e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      $('preview').src = URL.createObjectURL(file);
-      currentBlob = file;
-      statusEl.textContent = `Loaded: ${file.name}`;
-    });
-
-    runBtn.addEventListener('click', async () => {
-      if (!currentBlob) return;
-      runBtn.disabled = true;
-      $('svg-container').innerHTML = '';
-      $('svg-source').value = '';
-      $('progress-bar').style.display = 'block';
-      $('progress-fill').style.width = '50%';
-      statusEl.textContent = 'Converting...';
-
+    function getConfigs() {
       const isColor = colormodeSelect.value === 'color';
       const bgTransparent = $('bgTransparent').checked;
       const pathFillAuto = $('pathFillAuto').checked;
-
-      try {
-        const svg = await trace(currentBlob, {
+      return {
           colorMode: $('colormode').value,
           mode: $('mode').value,
           filterSpeckle: parseInt($('filterSpeckle').value),
@@ -265,15 +265,65 @@
           backgroundColor: bgTransparent ? 'none' : $('backgroundColor').value,
           pathFill: pathFillAuto ? undefined : $('pathFill').value,
           scale: parseFloat($('scale').value),
+      };
+    }
+
+    function setConfigs(cfg) {
+      if (cfg.colorMode !== undefined) $('colormode').value = cfg.colorMode;
+      if (cfg.mode !== undefined) $('mode').value = cfg.mode;
+      if (cfg.filterSpeckle !== undefined) { $('filterSpeckle').value = cfg.filterSpeckle; $('filterSpeckleVal').textContent = cfg.filterSpeckle; }
+      if (cfg.cornerThreshold !== undefined) { $('cornerThreshold').value = cfg.cornerThreshold; $('cornerThresholdVal').textContent = cfg.cornerThreshold; }
+      if (cfg.lengthThreshold !== undefined) { $('lengthThreshold').value = cfg.lengthThreshold; $('lengthThresholdVal').textContent = cfg.lengthThreshold; }
+      if (cfg.maxIterations !== undefined) { $('maxIterations').value = cfg.maxIterations; $('maxIterationsVal').textContent = cfg.maxIterations; }
+      if (cfg.spliceThreshold !== undefined) { $('spliceThreshold').value = cfg.spliceThreshold; $('spliceThresholdVal').textContent = cfg.spliceThreshold; }
+      if (cfg.pathPrecision !== undefined) { $('pathPrecision').value = cfg.pathPrecision; $('pathPrecisionVal').textContent = cfg.pathPrecision; }
+      if (cfg.colorPrecision !== undefined) { $('colorPrecision').value = cfg.colorPrecision; $('colorPrecisionVal').textContent = cfg.colorPrecision; }
+      if (cfg.layerDifference !== undefined) { $('layerDifference').value = cfg.layerDifference; $('layerDifferenceVal').textContent = cfg.layerDifference; }
+      if (cfg.invert !== undefined) $('invert').checked = cfg.invert;
+      updateColorOnlyVisibility();
+    }
+
+    // warm up WASM on load
+    trace(await fetch('apple.png').then(r => r.blob()), { colorMode: 'bw' })
+      .then(() => {
+        statusEl.textContent = 'WASM ready. Click Convert to trace apple.png, or choose another image.';
+        runBtn.disabled = false;
+        optBtn.disabled = false;
+      });
+
+    let currentBlob = await fetch('apple.png').then(r => r.blob());
+
+    $('file-input').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      $('preview').src = URL.createObjectURL(file);
+      currentBlob = file;
+      statusEl.textContent = `Loaded: ${file.name}`;
+    });
+
+    runBtn.addEventListener('click', () => doTrace());
+
+    optBtn.addEventListener('click', async () => {
+      if (!currentBlob) return;
+      runBtn.disabled = true;
+      optBtn.disabled = true;
+      $('progress-bar').style.display = 'block';
+      $('progress-fill').style.width = '0%';
+      statusEl.textContent = 'Optimizing...';
+
+      try {
+        const bestConfig = await optimize(currentBlob, getConfigs(), ({ progress, currentConfig, bestScore }) => {
+          $('progress-fill').style.width = `${progress * 100}%`;
+          statusEl.textContent = `Optimizing... Best SSIM: ${bestScore.toFixed(4)}`;
+          setConfigs(currentConfig);
         });
-        $('svg-container').innerHTML = svg;
-        $('svg-source').value = svg;
-        $('progress-fill').style.width = '100%';
-        statusEl.textContent = `Done. SVG: ${svg.length} chars`;
+        setConfigs(bestConfig);
+        statusEl.textContent = 'Optimization done. Running final trace...';
+        await doTrace();
       } catch (err) {
         statusEl.textContent = `Error: ${err}`;
-      } finally {
         runBtn.disabled = false;
+        optBtn.disabled = false;
       }
     });
   </script>

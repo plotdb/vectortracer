@@ -9,3 +9,5 @@ node_modules/
 
 # working files
 work
+
+web/static/assets/lib
