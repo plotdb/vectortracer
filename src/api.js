@@ -11,6 +11,7 @@
 
 import init, { BinaryImageConverter, ColorImageConverter } from './vectortracer.js';
 import { ssim, mse } from './ssim.js';
+import { reduceColors } from './svg-proc.js';
 
 let _initPromise = null;
 let _wasmInput = undefined; // overridable for bundled (inline) usage
@@ -44,6 +45,8 @@ function ensureInit() {
  * @param {string} [config.pathFill]             - Override all path fill colors. Defaults to auto.
  * @param {number} [config.scale=1]              - Scale factor applied to the output SVG.
  * @param {boolean} [config.sync=false]          - Run synchronously (blocks UI).
+ * @param {number} [config.maxColors]            - If set, post-process SVG to reduce fill colors to at most this many.
+ * @param {number} [config.colorMergeThreshold=17] - RGB distance below which colors are always merged (used with maxColors).
  * @returns {Promise<string>|string} SVG markup string
  */
 export async function trace(source, config = {}) {
@@ -63,10 +66,12 @@ export async function trace(source, config = {}) {
     colorPrecision   = 6,
     layerDifference  = 16,
     invert           = false,
-    backgroundColor  = undefined,
-    pathFill         = undefined,
-    scale            = 1,
-    sync             = false,
+    backgroundColor      = undefined,
+    pathFill             = undefined,
+    scale                = 1,
+    sync                 = false,
+    maxColors            = undefined,
+    colorMergeThreshold  = 17,
   } = config;
 
   const deg2rad = d => d * Math.PI / 180;
@@ -96,11 +101,15 @@ export async function trace(source, config = {}) {
     : new BinaryImageConverter(imageData, converterParams, options);
   converter.init();
 
+  const postprocess = svg => maxColors != null
+    ? reduceColors(svg, { maxColors, mergeThreshold: colorMergeThreshold })
+    : svg;
+
   if (sync) {
     while (!converter.tick());
     const svg = converter.getResult();
     converter.free();
-    return svg;
+    return postprocess(svg);
   }
 
   return new Promise(resolve => {
@@ -113,7 +122,7 @@ export async function trace(source, config = {}) {
       if (done) {
         const svg = converter.getResult();
         converter.free();
-        resolve(svg);
+        resolve(postprocess(svg));
       } else {
         tick(step);
       }

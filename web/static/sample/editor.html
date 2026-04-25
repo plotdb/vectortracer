@@ -46,6 +46,7 @@
     <input type="file" id="file-input" accept="image/*">
     <button id="run-btn" disabled>Convert</button>
     <button id="opt-btn" disabled>Optimize (SSIM)</button>
+    <button id="download-btn" disabled>Download SVG</button>
   </div>
 
   <div class="params">
@@ -144,6 +145,24 @@
       </div>
     </div>
 
+    <div class="section-title color-only">Color Reduction (post-process)</div>
+
+    <div class="param color-only">
+      <label>Max Colors (0 = off)</label>
+      <div class="param-row">
+        <input type="range" id="maxColors" min="0" max="32" value="0">
+        <span class="val" id="maxColorsVal">off</span>
+      </div>
+    </div>
+
+    <div class="param color-only">
+      <label>Merge Threshold (RGB dist)</label>
+      <div class="param-row">
+        <input type="range" id="colorMergeThreshold" min="0" max="50" value="17">
+        <span class="val" id="colorMergeThresholdVal">17</span>
+      </div>
+    </div>
+
     <div class="section-title">Options</div>
 
     <div class="param" id="invert-param">
@@ -193,6 +212,19 @@
     const statusEl = $('status');
     const runBtn = $('run-btn');
     const optBtn = $('opt-btn');
+    const downloadBtn = $('download-btn');
+
+    let lastSvg = null;
+
+    function downloadSvg() {
+      if (!lastSvg) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([lastSvg], { type: 'image/svg+xml' }));
+      a.download = (currentBlob?.name ?? 'output').replace(/\.[^.]+$/, '') + '.svg';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    downloadBtn.addEventListener('click', downloadSvg);
 
     // Shared trace logic
     async function doTrace() {
@@ -211,6 +243,8 @@
         $('svg-source').value = svg;
         $('progress-fill').style.width = '100%';
         statusEl.textContent = `Done. SVG: ${svg.length} chars`;
+        lastSvg = svg;
+        downloadBtn.disabled = false;
       } catch (err) {
         statusEl.textContent = `Error: ${err}`;
       } finally {
@@ -222,10 +256,16 @@
     // Wire up all sliders to show their value
     const sliders = ['filterSpeckle','pathPrecision','scale','cornerThreshold',
                      'lengthThreshold','maxIterations','spliceThreshold',
-                     'colorPrecision','layerDifference'];
+                     'colorPrecision','layerDifference','colorMergeThreshold'];
     sliders.forEach(id => {
       const el = $(id), val = $(id + 'Val');
       el.addEventListener('input', () => { val.textContent = el.value; });
+    });
+
+    // maxColors: 0 means off → show "off", else show value
+    $('maxColors').addEventListener('input', () => {
+      const v = parseInt($('maxColors').value);
+      $('maxColorsVal').textContent = v === 0 ? 'off' : v;
     });
 
     // Show/hide color-only params
@@ -265,6 +305,8 @@
           backgroundColor: bgTransparent ? 'none' : $('backgroundColor').value,
           pathFill: pathFillAuto ? undefined : $('pathFill').value,
           scale: parseFloat($('scale').value),
+          maxColors: parseInt($('maxColors').value) || undefined,
+          colorMergeThreshold: parseInt($('colorMergeThreshold').value),
       };
     }
 
@@ -279,6 +321,8 @@
       if (cfg.pathPrecision !== undefined) { $('pathPrecision').value = cfg.pathPrecision; $('pathPrecisionVal').textContent = cfg.pathPrecision; }
       if (cfg.colorPrecision !== undefined) { $('colorPrecision').value = cfg.colorPrecision; $('colorPrecisionVal').textContent = cfg.colorPrecision; }
       if (cfg.layerDifference !== undefined) { $('layerDifference').value = cfg.layerDifference; $('layerDifferenceVal').textContent = cfg.layerDifference; }
+      if (cfg.maxColors !== undefined) { $('maxColors').value = cfg.maxColors; $('maxColorsVal').textContent = cfg.maxColors; }
+      if (cfg.colorMergeThreshold !== undefined) { $('colorMergeThreshold').value = cfg.colorMergeThreshold; $('colorMergeThresholdVal').textContent = cfg.colorMergeThreshold; }
       if (cfg.invert !== undefined) $('invert').checked = cfg.invert;
       updateColorOnlyVisibility();
     }
