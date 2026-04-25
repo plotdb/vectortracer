@@ -29,7 +29,7 @@ const outfile = path.join(pkgDir, 'index.bundle.js');
 
 try {
   execSync(
-    `npx --yes esbuild "${entryPath}" --bundle --format=iife --global-name=vectortracer --log-level=error --outfile="${outfile}"`,
+    `npx --yes esbuild "${entryPath}" --bundle --format=iife --global-name=vectortracer --log-level=error --external:paper --external:paper-jsdom --outfile="${outfile}"`,
     { stdio: 'inherit', cwd: pkgDir }
   );
   const size = (readFileSync(outfile).length / 1024).toFixed(1);

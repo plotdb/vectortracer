@@ -11,7 +11,7 @@
 
 import init, { BinaryImageConverter, ColorImageConverter } from './vectortracer.js';
 import { ssim, mse } from './ssim.js';
-import { reduceColors } from './svg-proc.js';
+import { reduceColors, mergePaths as _mergePaths } from './svg-proc.js';
 
 let _initPromise = null;
 let _wasmInput = undefined; // overridable for bundled (inline) usage
@@ -47,6 +47,10 @@ function ensureInit() {
  * @param {boolean} [config.sync=false]          - Run synchronously (blocks UI).
  * @param {number} [config.maxColors]            - If set, post-process SVG to reduce fill colors to at most this many.
  * @param {number} [config.colorMergeThreshold=17] - RGB distance below which colors are always merged (used with maxColors).
+ * @param {boolean} [config.mergePaths=false]      - If true, merge adjacent same-color paths via paper.js boolean ops.
+ * @param {boolean} [config.mergeAfterReduce=true]  - If true, run reduceColors first then mergePaths (useful when
+ *   maxColors is set: quantise colors first so newly-identical neighbors can be merged geometrically).
+ * @param {object} [config.paper]               - paper.js instance for mergePaths. Auto-resolved when omitted.
  * @returns {Promise<string>|string} SVG markup string
  */
 export async function trace(source, config = {}) {
@@ -72,6 +76,9 @@ export async function trace(source, config = {}) {
     sync                 = false,
     maxColors            = undefined,
     colorMergeThreshold  = 17,
+    mergePaths           = false,
+    mergeAfterReduce     = true,
+    paper                = undefined,
   } = config;
 
   const deg2rad = d => d * Math.PI / 180;
@@ -101,9 +108,12 @@ export async function trace(source, config = {}) {
     : new BinaryImageConverter(imageData, converterParams, options);
   converter.init();
 
-  const postprocess = svg => maxColors != null
-    ? reduceColors(svg, { maxColors, mergeThreshold: colorMergeThreshold })
-    : svg;
+  const postprocess = async svg => {
+    if (mergePaths && !mergeAfterReduce) svg = await _mergePaths(svg, { paper });
+    if (maxColors != null) svg = reduceColors(svg, { maxColors, mergeThreshold: colorMergeThreshold });
+    if (mergePaths && mergeAfterReduce) svg = await _mergePaths(svg, { paper });
+    return svg;
+  };
 
   if (sync) {
     while (!converter.tick());
