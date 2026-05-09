@@ -44,8 +44,10 @@ impl Svg {
 		self.paths.push(path)
 	}
 	pub fn get_svg_string(&self) -> String {
-		let defaultBg = &"white".to_string();
-		let bg = self.options.backgroundColor.as_ref().unwrap_or(defaultBg);
+		let bg_style = match self.options.backgroundColor.as_deref() {
+			Some(bg) => format!(r#" style="background:{bg};""#),
+			None => "".to_string(),
+		};
 		let defaultAttributes = &"".to_string();
 		let attributes = self
 			.options
@@ -63,14 +65,14 @@ impl Svg {
 		};
 		let res = format!(
 			r#"
-                <svg xmlns="http://www.w3.org/2000/svg"{dim} style="background:{background};"{extra_space}{attributes}>
+                <svg xmlns="http://www.w3.org/2000/svg"{dim}{bg_style}{extra_space}{attributes}>
                     <g transform="scale({scale})">
                         {paths}
                     </g>
                 </svg>
             "#,
 			dim = dim,
-			background = bg,
+			bg_style = bg_style,
 			paths = self.paths.join(""),
 			scale = self.options.scale,
 			attributes = attributes,
