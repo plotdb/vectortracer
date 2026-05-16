@@ -40,3 +40,6 @@ features = [
   "console",
   "ImageData",
 ]
+
+[patch.crates-io]
+visioncortex = { git = "https://github.com/loadingio/visioncortex", branch = "master" }

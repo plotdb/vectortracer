@@ -421,8 +421,7 @@ dependencies = [
 [[package]]
 name = "visioncortex"
 version = "0.8.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c9a7e6cc136c7c79b4adbd311c46c323a19db7baf446822b5f90f84375934e3"
+source = "git+https://github.com/loadingio/visioncortex?branch=master#27a95b15880edb259623d45175207e9d7318b32f"
 dependencies = [
  "bit-vec",
  "flo_curves",
