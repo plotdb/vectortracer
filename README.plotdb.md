@@ -11,6 +11,9 @@ which provides WASM bindings to [Visioncortex's VTracer](https://github.com/visi
 - **`vectortracer.bundle.js`** — fully self-contained IIFE bundle with WASM inlined as base64
 - SVG output now includes correct `width`, `height`, and `viewBox`
 
+Additionally, it uses visioncortex fork from https://github.com/loadingio/visioncortex which has some minor improvement and added as a submodule here.
+
+
 ---
 
 ## Prerequisites
