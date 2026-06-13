@@ -1,0 +1,83 @@
+use visioncortex::{Color, CompoundPath, PointF64};
+
+pub struct Svg {
+	pub paths: Vec<String>,
+	pub options: SvgOptions,
+}
+pub struct SvgOptions {
+	pub scale: f32,
+	pub backgroundColor: Option<String>,
+	pub pathFill: Option<String>,
+	pub attributes: Option<String>,
+	pub width: Option<u32>,
+	pub height: Option<u32>,
+}
+/**
+Constructs a "dumb" string only svg.
+Real elements aren't used so that this can run in a webworker.
+*/
+impl Svg {
+	pub fn new(options: SvgOptions) -> Self {
+		let paths = vec![];
+		Self { paths, options }
+	}
+
+	pub fn add_path(&mut self, paths: &CompoundPath, color: &Color, precision: Option<u32>) {
+		let (string, offset) = paths.to_svg_string(true, PointF64::default(), precision);
+		// log(format!("{:#?}", paths).as_str());
+		// log(format!("{:#?}", paths.paths).as_str());
+		let defaultFill = &color.to_hex_string();
+		let fillColor = self.options.pathFill.as_ref().unwrap_or(defaultFill);
+		let path = format!(
+			r#"
+                <path
+                    d="{d}"
+                    transform="translate({x},{y})"
+                    fill="{fill}"
+                />
+            "#,
+			d = &string,
+			x = offset.x,
+			y = offset.y,
+			fill = fillColor
+		);
+		self.paths.push(path)
+	}
+	pub fn get_svg_string(&self) -> String {
+		let bg_style = match self.options.backgroundColor.as_deref() {
+			Some(bg) => format!(r#" style="background:{bg};""#),
+			None => "".to_string(),
+		};
+		let defaultAttributes = &"".to_string();
+		let attributes = self
+			.options
+			.attributes
+			.as_ref()
+			.unwrap_or(defaultAttributes);
+		let extra_space = if (attributes.len() > 0) { "" } else { " " };
+		let dim = match (self.options.width, self.options.height) {
+			(Some(w), Some(h)) => {
+				let sw = (w as f32 * self.options.scale) as u32;
+				let sh = (h as f32 * self.options.scale) as u32;
+				format!(r#" width="{sw}" height="{sh}" viewBox="0 0 {w} {h}""#)
+			}
+			_ => "".to_string(),
+		};
+		let res = format!(
+			r#"
+                <svg xmlns="http://www.w3.org/2000/svg"{dim}{bg_style}{extra_space}{attributes}>
+                    <g transform="scale({scale})">
+                        {paths}
+                    </g>
+                </svg>
+            "#,
+			dim = dim,
+			bg_style = bg_style,
+			paths = self.paths.join(""),
+			scale = self.options.scale,
+			attributes = attributes,
+			extra_space = extra_space
+		);
+		return res;
+	}
+}
