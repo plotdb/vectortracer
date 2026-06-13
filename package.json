@@ -1,7 +1,7 @@
 {
   "name": "vectortracer",
   "description": "Wasm bindings to visioncortex's vtracer library, a rust image vectorizer library.",
-  "version": "0.0.0-semanticlly-released",
+  "version": "0.0.1",
   "type": "module",
   "exports": {
     ".": "./pkg/vectortracer.js"
@@ -20,7 +20,7 @@
     "build": "pnpm exec wasm-pack build && rm pkg/package.json",
     "test": "cargo test",
     "actions:debug": "act -r -v -j build",
-    "prepare": "husky install && pnpm run build"
+    "prepare-with-build": "husky install && pnpm run build"
   },
   "devDependencies": {
     "@alanscodelog/commitlint-config": "^2.0.0",
