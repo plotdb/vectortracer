@@ -27,7 +27,7 @@
     "@alanscodelog/semantic-release-config": "^3.0.0",
     "@zbryikt/template": "^2.4.1",
     "commitlint": "^17.7.1",
-    "fedep": "^1.6.0",
+    "fedep": "^1.7.2",
     "husky": "^8.0.3",
     "semantic-release": "^21.0.6",
     "wasm-pack": "^0.12.1"
